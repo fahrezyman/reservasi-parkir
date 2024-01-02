@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Parking Reservation System</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      h1 {
+        color: #333;
+      }
+
+      .flex-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 800px;
+        margin-top: 20px;
+      }
+
+      .table-container {
+        flex: 1;
+        margin-right: 10px;
+      }
+
+      table {
+        width: 100%;
+        max-width: 400px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        background-color: #4caf50;
+        color: white;
+      }
+
+      .buttons-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+      }
+
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 20px;
+        font-size: 16px;
+        margin: 10px;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+      }
+
+      button:hover {
+        background-color: #45a049;
+      }
+
+      .ticket {
+        max-width: 400px;
+        margin: 20px auto;
+        background-color: #f4f4f4;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .ticket-header {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      .ticket-content {
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 3px;
+      }
+
+      input {
+        padding: 8px;
+        font-size: 16px;
+        margin-bottom: 10px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      script {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Parking Reservation System</h1>
+
+    <div class="flex-container">
+      <div class="table-container">
+        <table id="reservationTable" style="display: none">
+          <thead>
+            <tr>
+              <th>Space Number</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="reservationTableBody"></tbody>
+        </table>
+      </div>
+      <div class="ticket" id="ticketSection" style="display: none">
+        <div class="ticket-header">Parking Reservation Ticket</div>
+        <div class="ticket-content" id="ticketContent"></div>
+      </div>
+
+      <div class="buttons-container">
+        <button onclick="reserveParkingSpace()">Reserve Parking Space</button>
+        <button onclick="releaseParkingSpace()">Release Parking Space</button>
+        <button onclick="getAllTickets()">Show All Reservations</button>
+      </div>
+    </div>
+
+    <script>
+      const socket = new WebSocket("ws://localhost:3000");
+
+      socket.addEventListener("open", (event) => {
+        console.log("Connected to WebSocket server");
+      });
+
+      socket.addEventListener("message", (event) => {
+        const data = JSON.parse(event.data);
+        console.log("Received message from server:", data);
+
+        if (data.type === "reservationConfirmed") {
+          displayTicketReservation(data.spaceNumber);
+        } else if (data.type === "reservationFailed") {
+          alert("Failed to reserve parking space. " + data.message);
+        } else if (data.type === "releaseConfirmed") {
+          displayTicketRelease(data.spaceNumber, "Parking Space Released");
+        } else if (data.type === "releaseFailed") {
+          alert("Failed to release parking space. " + data.message);
+        } else if (data.type === "allTickets") {
+          displayAllTickets(data.tickets);
+        }
+      });
+
+      socket.addEventListener("close", (event) => {
+        console.log("Connection to WebSocket server closed");
+      });
+
+      function reserveParkingSpace() {
+        const spaceNumber = prompt("Enter parking space number:");
+        const message = JSON.stringify({
+          type: "reserve",
+          spaceNumber: spaceNumber,
+        });
+        socket.send(message);
+      }
+
+      function releaseParkingSpace() {
+        const spaceNumber = prompt("Enter parking space number to release:");
+        const message = JSON.stringify({
+          type: "release",
+          spaceNumber: spaceNumber,
+        });
+        socket.send(message);
+      }
+
+      function getAllTickets() {
+        const message = JSON.stringify({
+          type: "getAllTickets",
+        });
+        socket.send(message);
+      }
+
+      function displayTicketReservation(spaceNumber) {
+        const ticketSection = document.getElementById("ticketSection");
+        const ticketContent = document.getElementById("ticketContent");
+        ticketContent.innerHTML = `
+          <p><strong>Reservation Successful!</strong></p>
+          <p>Your parking space number: ${spaceNumber}</p>
+        `;
+        ticketSection.style.display = "block";
+      }
+
+      function displayTicketRelease(spaceNumber, message) {
+        const ticketSection = document.getElementById("ticketSection");
+        const ticketContent = document.getElementById("ticketContent");
+        ticketContent.innerHTML = `
+          <p><strong>${message}</strong></p>
+          <p>Parking space number: ${spaceNumber}</p>
+        `;
+        ticketSection.style.display = "block";
+      }
+
+      function displayAllTickets(tickets) {
+        const table = document.getElementById("reservationTable");
+        const tableBody = document.getElementById("reservationTableBody");
+
+        tableBody.innerHTML = "";
+
+        tickets.forEach((ticket) => {
+          const row = tableBody.insertRow();
+          const cell1 = row.insertCell(0);
+          const cell2 = row.insertCell(1);
+
+          cell1.textContent = ticket.spaceNumber;
+          cell2.textContent = ticket.status;
+        });
+
+        table.style.display = "block";
+      }
+    </script>
+  </body>
+</html>
